@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>websocket.html</title>
+    <meta name="keywords" content="keyword1,keyword2,keyword3">
+    <meta name="description" content="this is my page">
+    <meta name="content-type" content="text/html" charset="UTF-8">
+</head>
+<body>
+<div>
+    <h1>Compress Test</h1>
+    <!-- 生成多个不同uuid的文件，并且与服务端建立websocket连接，等待进度条推送 -->
+    <button onclick="addTask()">点击生成新的文件任务</button>
+    <div id="compressQueue">
+
+    </div>
+</div>
+<!-- 独立JS -->
+<script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js" charset="utf-8"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js" charset="utf-8"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js" charset="utf-8"></script>
+<script src="http://gosspublic.alicdn.com/aliyun-oss-sdk-6.15.0.min.js"></script>
+<script type="text/javascript">
+
+    // 生成uuid
+    function getUuid() {
+        var s = [];
+        var hexDigits = "0123456789abcdef";
+        for (var i = 0; i < 36; i++) {
+            s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
+        }
+        s[14] = "4"; // bits 12-15 of the time_hi_and_version field to 0010
+        s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1); // bits 6-7 of the clock_seq_hi_and_reserved to 01
+        s[8] = s[13] = s[18] = s[23] = "-";
+
+        var uuid = s.join("");
+        return uuid;
+    }
+    /*
+    生成新的文件任务
+    1. 新增div
+    2. 创建新的websocket，建立长连接
+    3. ajax调用后台接口，显示进度条
+     */
+    function addTask(){
+        var uuid = getUuid();
+        var fileUrl = "http://testUploadUrl.jpg";
+
+        var newDiv = "<div>" +
+            "<div>当前任务的uuid：" + uuid + "</div>" +
+            "<div style='background-color: wheat; height: 50px; width: 500px;' id='progress" + uuid + "'></div>" +
+            "</div>";
+        var compressQueue = $("#compressQueue");
+        compressQueue.append(newDiv);
+
+        connect(uuid);
+
+        // ajax
+        $.ajax({
+            url:'http://localhost:9505/compressTask',
+            method:'POST',
+            data: {
+                "uuid" : uuid,
+                "fileUrl" : fileUrl
+            },
+            success: function (result) {
+                console.log("ajax 成功，结果："+result)
+            },
+            error: function (error) {
+                console.log("ajax 发生错误"+error)
+            }
+        });
+    }
+
+    // websocket连接
+    function connect(uuid){
+        console.log(uuid+"开始连接WebSocket");
+
+        var socket = new SockJS('http://127.0.0.1:9505/endpointExcelman'); //连接SockJS的endpoint名称为"endpointOyzc"
+        var stompClient = Stomp.over(socket);//使用STMOP子协议的WebSocket客户端
+        stompClient.connect({},function(frame){//连接WebSocket服务端
+            console.log('Connected:' + frame);
+            //通过stompClient.subscribe订阅/queue/getResponse 目标(destination)发送的消息
+            stompClient.subscribe('/uuid/' + uuid + '/queue/getResponse',function(response){
+                // 判断进度条是否完成，若完成的话，释放websocket连接
+
+                console.log("当前的response:" + response.body);
+
+                showProgress(response.body, uuid);
+                if(response.body === "100%"){
+                    disconnect(stompClient);
+                }
+            });
+        });
+    }
+    // 推进进度条
+    function showProgress(currentProgress, uuid){
+        var progressUuid = $("#progress"+uuid);
+        progressUuid.append(currentProgress);
+    }
+    //关闭双通道
+    function disconnect(stompClient){
+        if(stompClient != null) {
+            stompClient.disconnect();
+        }
+        console.log("Disconnected");
+    }
+</script>
+</body>
+</html>

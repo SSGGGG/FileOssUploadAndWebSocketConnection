@@ -1,0 +1,21 @@
+server:
+  port: 9505
+spring:
+  application:
+    name: compress-test
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/authorization?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username:
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+aliyun:
+  oss:
+    stsEndpoint: sts.cn-shenzhen.aliyuncs.com
+    stsAccessKeyId:
+    stsAccessKeySecret:
+    stsRoleArn:
